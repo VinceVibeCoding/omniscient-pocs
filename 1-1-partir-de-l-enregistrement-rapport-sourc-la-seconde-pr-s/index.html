@@ -1,0 +1,40 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1:1 sourcé à la seconde près – prototype</title>
+<style>body{font:15px system-ui;margin:0;padding:0 12px 40px;max-width:900px;margin:auto}.b{background:#222;color:#fff;padding:8px;margin:0 -12px;text-align:center}
+table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:4px;vertical-align:top}.rej{background:#fdd}.ok{background:#dfd}input{width:100%;box-sizing:border-box}
+.seg{cursor:pointer;color:#06c}.hl{background:#ff9}.k{display:flex;gap:12px;flex-wrap:wrap}.k div{flex:1;min-width:230px;border:1px solid #ccc;padding:8px}</style></head><body>
+<div class="b">Prototype Omniscient · données simulées</div>
+<p>À essayer : choisissez un 1:1, puis modifiez l'horodatage ou la citation d'un point du « modèle » : le validateur l'accepte ou le rejette en direct. Cliquez une source pour voir le passage.</p>
+<select id="sel"></select> <button id="add">+ point sans horodatage</button> <button id="rst">Réinitialiser</button>
+<h3>Transcription (simulée)</h3><div id="tr"></div>
+<h3>Points du faux modèle (éditables)</h3><table id="pts"></table>
+<h3>Comparaison</h3><div class="k" id="cmp"></div>
+<h3>Rapport rendu (colonne source)</h3><table id="rep"></table>
+<script>
+const D=[{"id": "r1", "title": "1:1 Camille (équipe produit)", "transcript": [{"t": 12, "text": "Cette semaine j'ai fini la maquette du tableau de bord."}, {"t": 95, "text": "Je suis bloquée sur l'accès à la base de données de test, je n'ai pas les droits."}, {"t": 170, "text": "D'accord, je demande les droits à l'équipe infra dès aujourd'hui."}, {"t": 260, "text": "On décide de repousser la bêta au 15 décembre."}, {"t": 340, "text": "Je m'engage à envoyer le plan de test vendredi."}, {"t": 410, "text": "Et je prépare la démo pour le comité du 3."}], "truth": [{"id": "a", "cat": "blocage"}, {"id": "b", "cat": "décision"}, {"id": "c", "cat": "engagement"}, {"id": "d", "cat": "engagement"}], "notes": [{"text": "Maquette terminée", "truth": null}, {"text": "Bloquée sur les droits base de test", "truth": "a"}, {"text": "Bêta repoussée au 15 décembre", "truth": "b"}, {"text": "Camille veut changer d'équipe", "truth": "x"}], "model": [{"point": "Bloquée : pas de droits sur la base de test", "cat": "blocage", "t": 95, "cit": "je n'ai pas les droits", "truth": "a"}, {"point": "Décision : bêta repoussée au 15 décembre", "cat": "décision", "t": 260, "cit": "repousser la bêta au 15 décembre", "truth": "b"}, {"point": "Engagement : plan de test vendredi", "cat": "engagement", "t": 340, "cit": "envoyer le plan de test vendredi", "truth": "c"}, {"point": "Engagement : démo pour le comité du 3", "cat": "engagement", "t": 410, "cit": "je prépare la démo pour le comité du 3", "truth": "d"}, {"point": "Camille est démotivée", "cat": "blocage", "t": null, "cit": "", "truth": "x"}]}, {"id": "r2", "title": "1:1 Malik (équipe data)", "transcript": [{"t": 30, "text": "Le pipeline de nuit a échoué deux fois cette semaine."}, {"t": 120, "text": "Le blocage, c'est le quota de calcul, on est au plafond."}, {"t": 200, "text": "Je te propose qu'on passe au plan supérieur, tu valides le budget ?"}, {"t": 230, "text": "Oui, je valide le budget d'ici mercredi."}, {"t": 300, "text": "Moi je documente la reprise sur incident avant la fin du mois."}], "truth": [{"id": "a", "cat": "blocage"}, {"id": "b", "cat": "engagement"}, {"id": "c", "cat": "engagement"}], "notes": [{"text": "Pipeline instable", "truth": null}, {"text": "Quota de calcul au plafond", "truth": "a"}, {"text": "Budget supplémentaire de 20 k€ accordé", "truth": "x"}], "model": [{"point": "Blocage : quota de calcul au plafond", "cat": "blocage", "t": 120, "cit": "le quota de calcul, on est au plafond", "truth": "a"}, {"point": "Engagement manager : valider le budget mercredi", "cat": "engagement", "t": 230, "cit": "je valide le budget d'ici mercredi", "truth": "b"}, {"point": "Engagement : documenter la reprise sur incident", "cat": "engagement", "t": 300, "cit": "je documente la procédure de reprise avant vendredi", "truth": "x"}]}, {"id": "r3", "title": "1:1 Inès (équipe support)", "transcript": [{"t": 20, "text": "Le délai de réponse moyen est passé sous quatre heures."}, {"t": 110, "text": "Je n'arrive pas à suivre les tickets en anglais, j'aimerais une formation."}, {"t": 180, "text": "Je t'inscris à la session de janvier, c'est décidé."}, {"t": 250, "text": "Je m'engage à relire la base de connaissances d'ici deux semaines."}], "truth": [{"id": "a", "cat": "blocage"}, {"id": "b", "cat": "décision"}, {"id": "c", "cat": "engagement"}], "notes": [{"text": "Délai sous 4 h, bravo", "truth": null}, {"text": "Formation anglais en janvier", "truth": "b"}, {"text": "Relecture base de connaissances", "truth": "c"}], "model": [{"point": "Blocage : tickets en anglais", "cat": "blocage", "t": 110, "cit": "je n'arrive pas à suivre les tickets en anglais", "truth": "a"}, {"point": "Décision : formation en janvier", "cat": "décision", "t": 180, "cit": "je t'inscris à la session de janvier", "truth": "b"}, {"point": "Engagement : relire la base de connaissances", "cat": "engagement", "t": 250, "cit": "relire la base de connaissances d'ici deux semaines", "truth": "c"}]}];
+function norm(s){return s.toLowerCase().split(/\s+/).filter(Boolean).join(" ")}
+function validate(p,tr){if(!Number.isInteger(p.t))return "sans horodatage";const s=tr.find(x=>x.t===p.t);if(!s)return "horodatage inexistant";if(!p.cit||!norm(s.text).includes(norm(p.cit)))return "citation absente de la transcription";return null}
+function fmt(t){return String(Math.floor(t/60)).padStart(2,"0")+":"+String(t%60).padStart(2,"0")}
+function evaluate(r,pts){const truth=new Set(r.truth.map(t=>t.id));
+ const nv=r.notes.filter(n=>n.truth==="x").length,nf=[...truth].filter(i=>!r.notes.some(n=>n.truth===i)).length;
+ const ok=pts.filter(p=>!validate(p,r.transcript));
+ return{nv,nf,raw:pts.filter(p=>p.truth==="x").length,mi:ok.filter(p=>p.truth==="x").length,mf:[...truth].filter(i=>!ok.some(p=>p.truth===i)).length,rej:pts.length-ok.length,ok}}
+if(typeof document==="undefined"){module.exports={validate,evaluate,D};}else{
+let cur=0,pts,hl=null;const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+D.forEach((r,i)=>$("sel").add(new Option(r.title,i)));
+function load(){pts=JSON.parse(JSON.stringify(D[cur].model));draw()}
+function draw(){const r=D[cur];
+ $("tr").innerHTML=r.transcript.map(s=>`<div class="${hl===s.t?'hl':''}"><b>${fmt(s.t)}</b> ${esc(s.text)}</div>`).join("");
+ $("pts").innerHTML="<tr><th>Point</th><th>t (s)</th><th>Citation</th><th>Validation</th></tr>"+pts.map((p,i)=>{const e=validate(p,r.transcript);
+  return `<tr class="${e?'rej':'ok'}"><td>${esc(p.point)}</td><td><input data-i="${i}" data-k="t" value="${p.t??''}"></td><td><input data-i="${i}" data-k="cit" value="${esc(p.cit)}"></td><td>${e?'✗ '+e:'✓ accepté'}</td></tr>`}).join("");
+ const m=evaluate(r,pts);
+ $("cmp").innerHTML=`<div><b>Depuis les notes</b><br>inventés : ${m.nv}<br>engagements/décisions/blocages oubliés : ${m.nf}</div><div><b>Modèle sans validateur</b><br>inventés : ${m.raw}</div><div><b>Modèle + validateur</b><br>inventés : ${m.mi}<br>oubliés : ${m.mf}<br>rejetés : ${m.rej}</div>`;
+ $("rep").innerHTML="<tr><th>Point</th><th>Source</th></tr>"+m.ok.map(p=>`<tr><td>${esc(p.point)}</td><td><a class="seg" data-t="${p.t}">${fmt(p.t)}</a> « ${esc(p.cit)} »</td></tr>`).join("")}
+$("sel").onchange=e=>{cur=+e.target.value;hl=null;load()};
+$("rst").onclick=load;$("add").onclick=()=>{pts.push({point:"Point ajouté sans source",cat:"blocage",t:null,cit:"",truth:"x"});draw()};
+$("pts").addEventListener("change",e=>{const i=e.target.dataset.i,k=e.target.dataset.k;if(i==null)return;
+ pts[i][k]=k==="t"?(e.target.value.trim()===""?null:parseInt(e.target.value,10)):e.target.value;draw()});
+$("rep").addEventListener("click",e=>{if(e.target.dataset.t){hl=+e.target.dataset.t;draw();$("tr").scrollIntoView()}});
+load()}
+</script></body></html>
