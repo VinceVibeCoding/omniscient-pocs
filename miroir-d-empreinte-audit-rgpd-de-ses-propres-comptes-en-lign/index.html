@@ -1,0 +1,76 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Miroir d'empreinte — recoupement de comptes en local</title>
+<style>body{font:15px system-ui;margin:0;background:#f6f6f8;color:#222}header{background:#222;color:#fff;padding:10px 14px;font-weight:600}
+main{padding:14px;max-width:900px;margin:auto}.card{background:#fff;border-radius:8px;padding:10px;margin:8px 0;box-shadow:0 1px 3px #0002}
+textarea{width:100%;box-sizing:border-box;font:inherit;min-height:48px}.bad{color:#b00020}.good{color:#0a7a2f}.big{font-size:20px;font-weight:700}
+.bar{height:10px;background:#ddd;border-radius:5px}.bar i{display:block;height:10px;background:#d33;border-radius:5px}small{color:#555}</style></head><body>
+<header>Prototype Omniscient · données simulées</header><main>
+<p>À essayer : retirez le jeton d'une bio ou modifiez une ville/un employeur, puis regardez les recoupements, le risque et le seuil se recalculer.</p>
+<p>Seuil de fiabilité : <input type="range" id="th" min="0" max="100" value="70"> <b id="thv">70</b> %</p>
+<div id="accts"></div><div class="card" id="res"></div></main><script>
+// Logique partagée (copiée dans web/index.html). Données simulées.
+const TOKEN = "omni-verif-7f3a";
+const CITIES = ["Lyon","Paris","Lille","Nantes","Toulouse"];
+const EMPLOYERS = ["Acme","Globex","Initech","Hooli"];
+function extract(text) { // « modèle local » simulé : règles à la place d'Edge0
+  const out = {city:null, employer:null, links:[]};
+  for (const c of CITIES) if (new RegExp("\\b"+c+"\\b").test(text)) { out.city = c; break; }
+  for (const e of EMPLOYERS) if (new RegExp("(chez|@|at) "+e+"\\b","i").test(text)) { out.employer = e; break; }
+  out.links = (text.match(/https?:\/\/[^\s,)]+/g) || []).map(s=>s.replace(/\/$/,"").toLowerCase());
+  return out;
+}
+function analyse(accounts, threshold) {
+  const rejected = accounts.filter(a => !a.bio.includes(TOKEN)).map(a => a.pseudo+"@"+a.platform);
+  const ok = accounts.filter(a => a.bio.includes(TOKEN));
+  const ex = ok.map(a => ({a, f: extract(a.bio)}));
+  const pairs = [];
+  for (let i=0;i<ex.length;i++) for (let j=i+1;j<ex.length;j++) {
+    const x=ex[i], y=ex[j]; if (x.a.pseudo !== y.a.pseudo) continue;
+    const why=[]; let s=0;
+    if (x.f.city && x.f.city===y.f.city) { s+=1; why.push("ville "+x.f.city); }
+    if (x.f.employer && x.f.employer===y.f.employer) { s+=2; why.push("employeur "+x.f.employer); }
+    const l = x.f.links.filter(k=>y.f.links.includes(k));
+    if (l.length) { s+=3; why.push("lien "+l[0]); }
+    pairs.push({a:x.a.platform, b:y.a.platform, pseudo:x.a.pseudo, score:s, why,
+      predicted: s>=2, truth: x.a.person===y.a.person});
+  }
+  const pred = pairs.filter(p=>p.predicted);
+  const conf = pred.filter(p=>p.truth).length;
+  const precision = pred.length ? conf/pred.length : 0;
+  const risk = {};
+  for (const p of pred) risk[p.pseudo] = Math.min(100,(risk[p.pseudo]||0)+p.score*8);
+  return {rejected, pairs, predicted:pred.length, confirmed:conf, precision, pass: precision*100>=threshold, risk};
+}
+const SAMPLE = [
+ {pseudo:"alice_dev",platform:"GitHub",person:"A",bio:"Dev à Lyon, chez Acme. Blog https://alice.example/blog "+TOKEN},
+ {pseudo:"alice_dev",platform:"Mastodon",person:"A",bio:"Lyon. Je poste du code. https://alice.example/blog "+TOKEN},
+ {pseudo:"alice_dev",platform:"Reddit",person:"A",bio:"at Acme, vélo et café "+TOKEN},
+ {pseudo:"alice_dev",platform:"Twitch",person:"X",bio:"Streameuse à Lyon, jeux rétro "+TOKEN},
+ {pseudo:"alice_dev",platform:"Forum",person:"Z",bio:"Je suis alice_dev (usurpation, pas de jeton)"},
+ {pseudo:"bob42",platform:"GitHub",person:"B",bio:"Ingé chez Globex, Paris. https://bob.example "+TOKEN},
+ {pseudo:"bob42",platform:"Strava",person:"B",bio:"Paris, running. https://bob.example "+TOKEN},
+ {pseudo:"bob42",platform:"Steam",person:"B",bio:"Joueur, chez Globex le jour "+TOKEN},
+ {pseudo:"bob42",platform:"Flickr",person:"Y",bio:"Photographe, Paris, chez Globex (homonyme) "+TOKEN},
+ {pseudo:"clara_k",platform:"LinkedIn",person:"C",bio:"Chez Initech, Nantes. https://clara.example "+TOKEN},
+ {pseudo:"clara_k",platform:"Instagram",person:"C",bio:"Nantes. https://clara.example "+TOKEN},
+ {pseudo:"clara_k",platform:"Pinterest",person:"C",bio:"Déco, Nantes "+TOKEN},
+];
+let acc=JSON.parse(JSON.stringify(SAMPLE));
+const $=id=>document.getElementById(id);
+const esc=s=>s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+function render(){
+  $("accts").innerHTML=acc.map((a,i)=>`<div class="card"><b>${esc(a.pseudo)}</b> @ ${esc(a.platform)} <small>(vérité terrain : personne ${a.person})</small><textarea data-i="${i}">${esc(a.bio)}</textarea></div>`).join("");
+  document.querySelectorAll("textarea").forEach(t=>t.oninput=e=>{acc[+t.dataset.i].bio=t.value;compute()});
+  compute();
+}
+function compute(){
+  const th=+$("th").value;$("thv").textContent=th;
+  const r=analyse(acc,th);let h="";
+  r.rejected.forEach(x=>h+=`<p class="bad">Refusé (jeton « ${TOKEN} » absent de la bio) : ${esc(x)}</p>`);
+  r.pairs.filter(p=>p.predicted).forEach(p=>h+=`<p>${esc(p.pseudo)} : ${esc(p.a)} ↔ ${esc(p.b)} — score ${p.score} (${esc(p.why.join(", "))}) → <b class="${p.truth?"good":"bad"}">${p.truth?"confirmé":"faux (homonyme)"}</b></p>`);
+  h+="<h4>Risque par pseudo</h4>"+Object.entries(r.risk).map(([k,v])=>`<div>${esc(k)} : ${v}/100<div class="bar"><i style="width:${v}%"></i></div></div>`).join("");
+  h+=`<p class="big ${r.pass?"good":"bad"}">${r.confirmed}/${r.predicted} recoupements confirmés = ${Math.round(r.precision*100)} % → ${r.pass?"seuil atteint":"seuil non atteint"}</p>`;
+  $("res").innerHTML=h;
+}
+$("th").oninput=compute;render();
+</script></body></html>
